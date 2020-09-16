@@ -13,6 +13,7 @@ const mainMinutes, breakMinutes = 1, 1
 
 var currentMinutes, currentSeconds = mainMinutes, 0
 var quitGui chan bool
+var paused bool
 
 func main() {
 	ticker := time.NewTicker(1 * time.Second)
@@ -30,26 +31,28 @@ func main() {
 				defer wg.Done()
 				return
 			case <-ticker.C:
-				if currentMinutes == 0 && currentSeconds == 0 {
-					flip = true
-				} else {
-					if currentSeconds <= 0 {
-						currentSeconds = 59
-						currentMinutes -= 1
+				if !paused {
+					if currentMinutes == 0 && currentSeconds == 0 {
+						flip = true
 					} else {
-						currentSeconds -= 1
+						if currentSeconds <= 0 {
+							currentSeconds = 59
+							currentMinutes -= 1
+						} else {
+							currentSeconds -= 1
+						}
 					}
-				}
-				if flip {
-					if inBreak {
-						currentMinutes, currentSeconds = mainMinutes, 0
-					} else {
-						currentMinutes, currentSeconds = breakMinutes, 0
+					if flip {
+						if inBreak {
+							currentMinutes, currentSeconds = mainMinutes, 0
+						} else {
+							currentMinutes, currentSeconds = breakMinutes, 0
+						}
+						inBreak = !inBreak
+						flip = false
 					}
-					inBreak = !inBreak
-					flip = false
+					g.Update(update)
 				}
-				g.Update(update)
 			}
 		}
 	}()
@@ -58,7 +61,6 @@ func main() {
 	if err := g.MainLoop(); err != nil && err != gocui.ErrQuit {
 		log.Panicln(err)
 	}
-	fmt.Printf("reeee")
 	g.Close()
 }
 
@@ -71,6 +73,10 @@ func initGui() *gocui.Gui {
 	g.SetManagerFunc(layout)
 
 	if err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, quit); err != nil {
+		log.Panicln(err)
+	}
+
+	if err := g.SetKeybinding("", 'p', gocui.ModNone, pause); err != nil {
 		log.Panicln(err)
 	}
 
@@ -107,4 +113,9 @@ func layout(g *gocui.Gui) error {
 
 func quit(g *gocui.Gui, v *gocui.View) error {
 	return gocui.ErrQuit
+}
+
+func pause(g *gocui.Gui, v *gocui.View) error {
+	paused = !paused
+	return nil
 }
